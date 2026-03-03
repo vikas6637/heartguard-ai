@@ -60,20 +60,16 @@ app.get('/api/health', (req, res) => {
 // ── Error handler ──
 app.use(errorHandler);
 
-// ── Start ──
-const PORT = process.env.PORT || 5000;
+// ── Connect DB (works for both local & serverless) ──
+connectDB();
 
-const startServer = async () => {
-  await connectDB();
+// ── Start server only when running locally (not on Vercel) ──
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`\n✓ HeartGuard API running on http://localhost:${PORT}`);
     console.log(`  Environment: ${process.env.NODE_ENV || 'development'}\n`);
   });
-};
-
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+}
 
 module.exports = app;
