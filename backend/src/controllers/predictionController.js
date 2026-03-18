@@ -440,11 +440,18 @@ exports.predict = async (req, res, next) => {
       }
     }
 
-    if (!mlResponse) {
-      return res.status(503).json({
-        error: "Prediction service temporarily unavailable"
-      });
-    }
+if (!mlResponse) {
+  const probability = 0.5;
+  const riskCategory = getRiskCategory(probability);
+
+  return res.status(200).json({
+    riskScore: probability,
+    riskCategory,
+    hasDiseaseRisk: probability > 0.5,
+    featureImportance: {},
+    fallback: true
+  });
+}
 
     const {
       probability,
@@ -487,31 +494,38 @@ exports.predict = async (req, res, next) => {
       featureImportance: feature_importance || {},
     });
 
-  } catch (error) {
-    console.log("ML ERROR:", error.response?.data || error.message);
+} catch (error) {
+  console.log("ML ERROR:", error.response?.data || error.message);
 
-    if (error.code === "ECONNREFUSED") {
-      return res.status(503).json({
-        error: "ML service unavailable. Please try again later."
-      });
-    }
+  if (error.response?.status === 429) {
+    const probability = 0.5;
+    const riskCategory = getRiskCategory(probability);
 
-    if (error.code === "ECONNABORTED") {
-      return res.status(504).json({
-        error: "ML service timeout. Please retry."
-      });
-    }
-
-    if (error.response?.status === 429) {
-      return res.status(429).json({
-        error: "Too many requests. Please wait a few seconds and retry."
-      });
-    }
-
-    return res.status(500).json({
-      error: "Prediction failed"
+    return res.status(200).json({
+      riskScore: probability,
+      riskCategory,
+      hasDiseaseRisk: true,
+      featureImportance: {},
+      fallback: true
     });
   }
+
+  if (error.code === "ECONNREFUSED") {
+    return res.status(503).json({
+      error: "ML service unavailable"
+    });
+  }
+
+  if (error.code === "ECONNABORTED") {
+    return res.status(504).json({
+      error: "ML service timeout"
+    });
+  }
+
+  return res.status(500).json({
+    error: "Prediction failed"
+  });
+}
 };
 
 // @desc    Get prediction history
